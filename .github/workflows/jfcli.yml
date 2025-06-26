@@ -1,0 +1,69 @@
+name: "JF-CLI"
+on:
+# TURN-OFF on every push 
+  push:
+    branches: 
+      - main
+permissions:
+  actions: read # for detecting the Github Actions environment.
+  id-token: write # for creating OIDC tokens for signing.
+  packages: write # for uploading attestations.
+  contents: read
+  security-events: write # Required for uploading code scanning.
+env:
+  JF_RT_URL: "https://${{vars.JF_NAME}}.jfrog.io"
+  BUILD_NAME: "eShop"
+  BUILD_ID: "ga-${{github.run_number}}"
+  JOB_SUMMARY: false
+  JFROG_CLI_LOG_LEVEL: DEBUG # DEBUG, INFO, WARN, ERROR
+  JAVA_PROVIDER: 'corretto'
+  JAVA_VERSION: '17'
+  EVIDENCE_SPEC_JSON: 'evd-spec-info.json'  # ref https://jfrog.com/help/r/jfrog-artifactory-documentation/evidence-setup
+  RBv2_SPEC_JSON: "rbv2-spec-info.json"
+  RBV2_SIGNING_KEY: "${{secrets.RBV2_SIGNING_KEY}}" # ref https://jfrog.com/help/r/jfrog-artifactory-documentation/create-signing-keys-for-release-bundles-v2
+  DEFAULT_WORKSPACE: "${{github.workspace}}"  
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Setup JFrog CLI"
+      uses: jfrog/setup-jfrog-cli@v4
+      id: setup-cli
+      env:
+        JF_URL: ${{env.JF_RT_URL}}
+        JFROG_CLI_RELEASES_REPO: '${{env.JF_RT_URL}}/artifactory/${{env.RT_REPO_MVN_VIRTUAL}}' 
+        JFROG_CLI_EXTRACTORS_REMOTE: '${{env.JF_RT_URL}}/artifactory/${{env.RT_REPO_MVN_VIRTUAL}}'
+        JF_GIT_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        JFROG_CLI_LOG_LEVEL: ${{env.JFROG_CLI_LOG_LEVEL}}
+      with:
+        version: latest  #2.71.0
+        oidc-provider-name: ${{vars.JF_OIDC_PROVIDER_NAME}}
+
+    - name: "Clone VCS"
+      uses: actions/checkout@v4
+    - name: "Setup DotNet"
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+    - name: "Setup Node"
+      uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+    - name: "Install .NET HTTPS Development Certificate"
+      run: |
+        dotnet tool update -g linux-dev-certs
+        dotnet linux-dev-certs install
+    - name: "Software version"
+      run: |
+        # JFrog CLI version
+        jf --version
+        # Ping the server
+        jf rt ping
+        # Node version
+        node -v
+        # DotNet version
+        dotnet --version
+        # jf config
+        jf config show
+
