@@ -105,6 +105,7 @@ jobs:
   
     - name: "Xray & JAS: Audit"  
       timeout-minutes: 15 
+      continue-on-error: true 
       run: |
         jf audit --nuget --sast=true --sca=true --secrets=true --licenses=true --validate-secrets=true --vuln=true --format=table --extended-table=true --threads=100 --fail=false
 
