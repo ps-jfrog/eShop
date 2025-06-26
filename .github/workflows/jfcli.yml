@@ -56,7 +56,7 @@ jobs:
       run: |
         dotnet tool update -g linux-dev-certs
         dotnet linux-dev-certs install
-        dotnet workload install maui
+
     - name: "Software version"
       run: |
         # JFrog CLI version
@@ -98,11 +98,11 @@ jobs:
           echo "    - DotNet Repo: [${{env.RT_REPO_NUGET_VIRTUAL}}](${{env.JF_RT_URL}}/webapp/#/artifacts/${{env.RT_REPO_NUGET_VIRTUAL}})" >> $GITHUB_STEP_SUMMARY
           echo " " >> $GITHUB_STEP_SUMMARY
 
-    # - name: "Curation: audit" 
-    #   timeout-minutes: 15    
-    #   continue-on-error: true  
-    #   run: |
-    #     jf ca --format=table --threads=100
+    - name: "Curation: audit" 
+      timeout-minutes: 15    
+      continue-on-error: true  
+      run: |
+        jf ca --format=table --threads=100
   
     - name: "Xray & JAS: Audit"  
       timeout-minutes: 15 
