@@ -15,15 +15,19 @@ env:
   BUILD_NAME: "eShop"
   BUILD_ID: "ga-${{github.run_number}}"
   JOB_SUMMARY: false
-  JFROG_CLI_LOG_LEVEL: DEBUG # DEBUG, INFO, WARN, ERROR
-  JAVA_PROVIDER: 'corretto'
-  JAVA_VERSION: '17'
+  JFROG_CLI_LOG_LEVEL: "DEBUG" # DEBUG, INFO, WARN, ERROR
+  RT_REPO_NUGET_VIRTUAL: "ps-eshop-nuget-virtual"
+  RT_REPO_NUGET_DEFAULT_LOCAL: "ps-eshop-nuget-default-local"
+  RT_REPO_NUGET_DEV_LOCAL: "ps-eshop-nuget-dev-local"
+  RT_REPO_NUGET_QA_LOCAL: "ps-eshop-nuget-qa-local"
+  RT_REPO_NUGET_PROD_LOCAL: "ps-eshop-nuget-prod-local"
   EVIDENCE_SPEC_JSON: 'evd-spec-info.json'  # ref https://jfrog.com/help/r/jfrog-artifactory-documentation/evidence-setup
   RBv2_SPEC_JSON: "rbv2-spec-info.json"
   RBV2_SIGNING_KEY: "${{secrets.RBV2_SIGNING_KEY}}" # ref https://jfrog.com/help/r/jfrog-artifactory-documentation/create-signing-keys-for-release-bundles-v2
   DEFAULT_WORKSPACE: "${{github.workspace}}"  
 jobs:
-  test:
+  dotnetPackage:
+    name: "DotNet"
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -32,8 +36,6 @@ jobs:
       id: setup-cli
       env:
         JF_URL: ${{env.JF_RT_URL}}
-        JFROG_CLI_RELEASES_REPO: '${{env.JF_RT_URL}}/artifactory/${{env.RT_REPO_MVN_VIRTUAL}}' 
-        JFROG_CLI_EXTRACTORS_REMOTE: '${{env.JF_RT_URL}}/artifactory/${{env.RT_REPO_MVN_VIRTUAL}}'
         JF_GIT_TOKEN: ${{secrets.GITHUB_TOKEN}}
         JFROG_CLI_LOG_LEVEL: ${{env.JFROG_CLI_LOG_LEVEL}}
       with:
@@ -67,3 +69,45 @@ jobs:
         # jf config
         jf config show
 
+    - name: "Config jf with mvn repos"
+      run: |
+          jf dotnetc --global --repo-resolve ${{env.RT_REPO_NUGET_VIRTUAL}}
+
+    - name: "list folder"
+      run: |
+          pwd
+          tree .
+
+    - name: "DotNet: Summary"
+      run: |
+          echo "# :frog: DotNet: Summary :pushpin:" >> $GITHUB_STEP_SUMMARY
+          echo " " >> $GITHUB_STEP_SUMMARY
+          echo " " >> $GITHUB_STEP_SUMMARY
+          echo " - Installed JFrog CLI [$(jf --version)](https://jfrog.com/getcli/) " >> $GITHUB_STEP_SUMMARY
+          echo "    - $(jf --version) " >> $GITHUB_STEP_SUMMARY
+          echo "    - $(node -v) " >> $GITHUB_STEP_SUMMARY
+          echo "    - $(npm -v) " >> $GITHUB_STEP_SUMMARY- 
+          echo "    - $(dotnet --version) " >> $GITHUB_STEP_SUMMARY
+          echo " - Configured the JFrog Cli and Docker login with SaaS Artifactory OIDC integration  " >> $GITHUB_STEP_SUMMARY
+          echo " " >> $GITHUB_STEP_SUMMARY
+          echo " - Variables info" >> $GITHUB_STEP_SUMMARY
+          echo "    - ID: ${{env.BUILD_ID}} " >> $GITHUB_STEP_SUMMARY
+          echo "    - Build Name: ${{env.BUILD_NAME}} " >> $GITHUB_STEP_SUMMARY
+          echo "    - DotNet Repo URL: ${{env.RT_REPO_NUGET_VIRTUAL}}" >> $GITHUB_STEP_SUMMARY
+          echo " " >> $GITHUB_STEP_SUMMARY
+
+    - name: "Curation: audit" 
+      timeout-minutes: 15    
+      continue-on-error: true  
+      run: |
+        jf ca --format=table --threads=100
+  
+    - name: "Xray & JAS: Audit"  
+      timeout-minutes: 15 
+      continue-on-error: true 
+      run: |
+        jf audit --nuget --sast=true --sca=true --secrets=true --licenses=true --validate-secrets=true --vuln=true --format=table --extended-table=true --threads=100 --fail=false
+
+    - name: "Package: Build NuGet"
+      run: |  
+          jf dotnet build eShop.Web.slnf --build-name ${{env.BUILD_NAME}} --build-number ${{env.BUILD_ID}}
